@@ -1,5 +1,5 @@
 import torch
-from diffusers import KandinskyV22Pipeline, KandinskyV22PriorPipeline
+from diffusers import StableDiffusionPipeline
 import spacy
 import logging
 import numpy as np
@@ -13,21 +13,16 @@ logger = logging.getLogger(__name__)
 class RoadSceneGenerator:
     """
     Generates road scene images based on text descriptions.
-    Uses a diffusion model (Kandinsky) and NLP (spaCy) for enhancements.
+    Uses a diffusion model (Stable Diffusion) and NLP (spaCy) for enhancements.
     """
     def __init__(self):
-        self.device = torch.device('cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.nlp = spacy.load("en_core_web_sm")
 
         try:
-            self.prior_pipeline = KandinskyV22PriorPipeline.from_pretrained(
-                "kandinsky-community/kandinsky-2-2-prior",
-                torch_dtype=torch.float32,
-            ).to(self.device)
-
-            self.pipe = KandinskyV22Pipeline.from_pretrained(
-                "kandinsky-community/kandinsky-2-2-decoder",
-                torch_dtype=torch.float32,
+            self.pipe = StableDiffusionPipeline.from_pretrained(
+                "runwayml/stable-diffusion-v1-5",
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
             ).to(self.device)
 
         except Exception as e:
@@ -103,18 +98,11 @@ class RoadSceneGenerator:
         logger.info(f"Processing enhanced description: {enhanced_description}")
 
         try:
-            embeds = self.prior_pipeline(
+            image = self.pipe(
                 prompt=enhanced_description,
                 negative_prompt=negative_prompt,
                 num_inference_steps=30,
-                generator=generator
-            )
-
-            image = self.pipe(
-                image_embeds=embeds.image_embeds,
-                negative_image_embeds=embeds.negative_image_embeds,
-                guidance_scale=7.0,
-                num_inference_steps=30,
+                generator=generator,
                 height=512,
                 width=512
             ).images[0]
