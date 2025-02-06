@@ -1,0 +1,9 @@
+[server]
+runOnSave = false
+fileWatcherType = "none"
+
+[logger]
+level = "info"
+
+[runner]
+fastReruns = false

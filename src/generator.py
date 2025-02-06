@@ -16,20 +16,19 @@ class RoadSceneGenerator:
     Uses a diffusion model (Kandinsky) and NLP (spaCy) for enhancements.
     """
     def __init__(self):
-        self.device = torch.device("cpu") 
+        self.device = torch.device('cpu')
         self.nlp = spacy.load("en_core_web_sm")
 
         try:
-            logger.info("Initializing models with CPU optimization...")
             self.prior_pipeline = KandinskyV22PriorPipeline.from_pretrained(
                 "kandinsky-community/kandinsky-2-2-prior",
-                torch_dtype=torch.float32
-            )
+                torch_dtype=torch.float32,
+            ).to(self.device)
 
             self.pipe = KandinskyV22Pipeline.from_pretrained(
                 "kandinsky-community/kandinsky-2-2-decoder",
-                torch_dtype=torch.float32
-            )
+                torch_dtype=torch.float32,
+            ).to(self.device)
 
         except Exception as e:
             logger.error(f"Error initializing models: {str(e)}")
@@ -87,21 +86,28 @@ class RoadSceneGenerator:
                 return ent.text
         return None
 
-    def generate_scene(self, description: str, seed: Optional[int] = None) -> Image.Image:
+    def generate_scene(self, 
+                       description: str, 
+                       seed: Optional[int] = None,
+                       negative_prompt: str = "low quality, blurry, noisy, animated",
+                       ) -> Image.Image:
         """
         Generates an image based on the provided description.
         """
         if seed is not None:
-            torch.manual_seed(seed)
-            np.random.seed(seed)
+            generator = torch.Generator(device=self.device).manual_seed(seed)
+        else:
+            generator = None
 
         enhanced_description = self.enhance_description(description)
         logger.info(f"Processing enhanced description: {enhanced_description}")
 
         try:
             embeds = self.prior_pipeline(
-                enhanced_description,
-                num_inference_steps=30
+                prompt=enhanced_description,
+                negative_prompt=negative_prompt,
+                num_inference_steps=30,
+                generator=generator
             )
 
             image = self.pipe(
